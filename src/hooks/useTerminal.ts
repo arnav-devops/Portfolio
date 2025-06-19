@@ -32,6 +32,7 @@ export function useTerminal() {
   useEffect(() => { buildRunningRef.current = state.buildRunning; }, [state.buildRunning]);
 
   const addOutput = useCallback((content: string, type: 'command' | 'output' | 'error' = 'output') => {
+    console.log('addOutput:', content);
     const newOutput: OutputEntry = {
       id: `${Date.now()}-${Math.random()}`,
       content,
@@ -44,130 +45,18 @@ export function useTerminal() {
     }));
   }, []);
 
-  const executeCommand = useCallback((command: string) => {
-    if (!command.trim()) return;
-
-    setState(prev => ({
-      ...prev,
-      commandHistory: [command, ...prev.commandHistory].slice(0, 50),
-      historyIndex: -1,
-      currentCommand: '',
-    }));
-
-    const [cmd, ...args] = command.trim().toLowerCase().split(' ');
-
-    // Command execution logic
-    switch (cmd) {
-      case 'help':
-        addOutput(constants.COMMANDS_HELP);
-        break;
-
-      case 'whoami':
-        if (state.isRoot) {
-          addOutput('root');
-        } else {
-          addOutput(`Arnav Banerjee
-Cloud DevOps Engineer with 3+ years of experience
-Automating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
-        }
-        break;
-
-      case 'about':
-        addOutput(`cat about.txt${constants.ABOUT_TEXT}`);
-        break;
-
-      case 'experience':
-        addOutput(`jobs${constants.EXPERIENCE_TEXT}`);
-        break;
-
-      case 'projects':
-        addOutput(`ls -l projects${constants.PROJECTS_TEXT}`);
-        break;
-
-      case 'skills':
-        if (args[0] && skills[args[0]]) {
-          addOutput(`echo $SKILLS_${args[0].toUpperCase()}\n${skills[args[0]]}`);
-        } else {
-          addOutput(`env | grep SKILLS${constants.SKILLS_ENV}`);
-        }
-        break;
-
-      case 'certifications':
-        addOutput(`cat certifications.txt${constants.CERTIFICATIONS_TEXT}`);
-        break;
-
-      case 'contact':
-        addOutput('contact-form');
-        break;
-
-      case 'deploy':
-        handleDeploy(args[0]);
-        break;
-
-      case 'apt-update':
-      case 'sudo':
-        if (args[0] === 'apt' && args[1] === 'update') {
-          handleAptUpdate();
-        } else if (args[0] === 'su') {
-          handleSudoSu();
-        } else {
-          addOutput(`bash: ${command}: command not found`, 'error');
-        }
-        break;
-
-      case 'su':
-        handleSudoSu();
-        break;
-
-      case 'exit':
-        handleExit();
-        break;
-
-      case 'top':
-        handleTop();
-        break;
-
-      case 'git':
-        if (args[0] === 'log') {
-          handleGitLog(args.slice(1));
-        } else {
-          addOutput(`bash: git ${args[0]}: command not found`, 'error');
-        }
-        break;
-
-      case 'man':
-        handleMan(args[0]);
-        break;
-
-      case 'curl':
-        handleCurl(args[0]);
-        break;
-
-      case 'theme':
-        handleTheme(args[0]);
-        break;
-
-      case 'day':
-      case 'night':
-        handleTheme(cmd === 'day' ? 'light' : 'dark');
-        break;
-
-      case 'clear':
-        setState(prev => ({ ...prev, outputs: [prev.outputs[0]] }));
-        break;
-
-      case 'stop':
-        handleStop();
-        break;
-
-      case 'sound':
-        handleSound(args[0]);
-        break;
-
-      default:
-        addOutput(`bash: ${command}: command not found`, 'error');
-    }
-  }, [state.isRoot, state.buildRunning, addOutput]);
+  const updateLastOutput = useCallback((content: string) => {
+    console.log('updateLastOutput:', content);
+    setState(prev => {
+      const outputs = [...prev.outputs];
+      outputs[outputs.length - 1] = {
+        ...outputs[outputs.length - 1],
+        content,
+        timestamp: new Date(),
+      };
+      return { ...prev, outputs };
+    });
+  }, []);
 
   const handleDeploy = useCallback((projectName?: string) => {
     if (buildRunningRef.current) {
@@ -181,6 +70,7 @@ Automating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
     }
 
     setState(prev => ({ ...prev, buildRunning: true }));
+    addOutput(''); // Add an empty output block for animation
 
     const project = projects[projectName];
     const pipeline = [
@@ -194,14 +84,26 @@ Automating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
     ];
 
     let step = 0;
+    const totalSteps = pipeline.length + project.logs.length + 1;
+
     const animatePipeline = () => {
       if (!buildRunningRef.current) return;
 
       if (step < pipeline.length) {
-        addOutput(pipeline.slice(0, step + 1).join('\n'));
-      } else if (step === pipeline.length) {
-        // Show build complete and project info
-        addOutput(pipeline.join('\n') + '\n' + project.logs.join('\n') + '\n' + project.success + '\n' + project.details);
+        updateLastOutput(pipeline.slice(0, step + 1).join('\n'));
+      } else if (step < pipeline.length + project.logs.length) {
+        const logIndex = step - pipeline.length;
+        updateLastOutput(
+          pipeline.join('\n') + '\n' +
+          project.logs.slice(0, logIndex + 1).join('\n')
+        );
+      } else if (step === totalSteps - 1) {
+        updateLastOutput(
+          pipeline.join('\n') + '\n' +
+          project.logs.join('\n') + '\n' +
+          project.success + '\n' +
+          project.details
+        );
         setState(prev => ({ ...prev, buildRunning: false }));
         return;
       }
@@ -209,8 +111,8 @@ Automating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
       buildTimeoutRef.current = setTimeout(animatePipeline, 1000);
     };
 
-    animatePipeline();
-  }, [addOutput, projects]);
+    setTimeout(animatePipeline, 100);
+  }, [addOutput, updateLastOutput]);
 
   const handleAptUpdate = useCallback(() => {
     const updateLogs = [
@@ -307,11 +209,7 @@ Automating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
 
     const output = isOneline
       ? logs.map(log => `${log.hash} ${log.message.split('\n')[0]}`).join('\n')
-      : logs.map(log => `commit ${log.hash} ${log.head || ''}
-Author: Arnav Banerjee <arnav@devops.io>
-Date:   ${log.date}
-
-    ${log.message}`).join('\n\n');
+      : logs.map(log => `commit ${log.hash} ${log.head || ''}\nAuthor: Arnav Banerjee <arnav@devops.io>\nDate:   ${log.date}\n\n    ${log.message}`).join('\n\n');
 
     addOutput(output);
   }, [addOutput]);
@@ -336,11 +234,7 @@ Date:   ${log.date}
     }
 
     const url = profiles[profile as keyof typeof profiles];
-    addOutput(`[INFO] Fetching ${url}...
-HTTP/1.1 200 OK
-Content-Type: text/html
-Location: ${url}
-<a href="${url}" target="_blank" rel="noopener noreferrer">Visit ${profile.charAt(0).toUpperCase() + profile.slice(1)}</a>`);
+    addOutput(`[INFO] Fetching ${url}...\nHTTP/1.1 200 OK\nContent-Type: text/html\nLocation: ${url}\n<a href="${url}" target="_blank" rel="noopener noreferrer">Visit ${profile.charAt(0).toUpperCase() + profile.slice(1)}</a>`);
   }, [addOutput]);
 
   const handleTheme = useCallback((theme?: string) => {
@@ -427,13 +321,113 @@ Location: ${url}
     return commands.filter(cmd => cmd.startsWith(command));
   }, []);
 
-  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (buildTimeoutRef.current) clearTimeout(buildTimeoutRef.current);
       if (topTimeoutRef.current) clearTimeout(topTimeoutRef.current);
     };
   }, []);
+
+  const executeCommand = useCallback((command: string) => {
+    if (!command.trim()) return;
+
+    setState(prev => ({
+      ...prev,
+      commandHistory: [command, ...prev.commandHistory].slice(0, 50),
+      historyIndex: -1,
+      currentCommand: '',
+    }));
+
+    const [cmd, ...args] = command.trim().toLowerCase().split(' ');
+
+    switch (cmd) {
+      case 'help':
+        addOutput(constants.COMMANDS_HELP);
+        break;
+      case 'whoami':
+        if (state.isRoot) {
+          addOutput('root');
+        } else {
+          addOutput(`Arnav Banerjee\nCloud DevOps Engineer with 3+ years of experience\nAutomating CI/CD pipelines, scaling cloud infra, and ensuring 94.99% uptime`);
+        }
+        break;
+      case 'about':
+        addOutput(`cat about.txt${constants.ABOUT_TEXT}`);
+        break;
+      case 'experience':
+        addOutput(`jobs${constants.EXPERIENCE_TEXT}`);
+        break;
+      case 'projects':
+        addOutput(`ls -l projects${constants.PROJECTS_TEXT}`);
+        break;
+      case 'skills':
+        if (args[0] && skills[args[0]]) {
+          addOutput(`echo $SKILLS_${args[0].toUpperCase()}\n${skills[args[0]]}`);
+        } else {
+          addOutput(`env | grep SKILLS${constants.SKILLS_ENV}`);
+        }
+        break;
+      case 'certifications':
+        addOutput(`cat certifications.txt${constants.CERTIFICATIONS_TEXT}`);
+        break;
+      case 'contact':
+        addOutput('contact-form');
+        break;
+      case 'deploy':
+        handleDeploy(args[0]);
+        break;
+      case 'apt-update':
+      case 'sudo':
+        if (args[0] === 'apt' && args[1] === 'update') {
+          handleAptUpdate();
+        } else if (args[0] === 'su') {
+          handleSudoSu();
+        } else {
+          addOutput(`bash: ${command}: command not found`, 'error');
+        }
+        break;
+      case 'su':
+        handleSudoSu();
+        break;
+      case 'exit':
+        handleExit();
+        break;
+      case 'top':
+        handleTop();
+        break;
+      case 'git':
+        if (args[0] === 'log') {
+          handleGitLog(args.slice(1));
+        } else {
+          addOutput(`bash: git ${args[0]}: command not found`, 'error');
+        }
+        break;
+      case 'man':
+        handleMan(args[0]);
+        break;
+      case 'curl':
+        handleCurl(args[0]);
+        break;
+      case 'theme':
+        handleTheme(args[0]);
+        break;
+      case 'day':
+      case 'night':
+        handleTheme(cmd === 'day' ? 'light' : 'dark');
+        break;
+      case 'clear':
+        setState(prev => ({ ...prev, outputs: [prev.outputs[0]] }));
+        break;
+      case 'stop':
+        handleStop();
+        break;
+      case 'sound':
+        handleSound(args[0]);
+        break;
+      default:
+        addOutput(`bash: ${command}: command not found`, 'error');
+    }
+  }, [state.isRoot, state.buildRunning, addOutput, handleDeploy, handleAptUpdate, handleSudoSu, handleExit, handleTop, handleGitLog, handleMan, handleCurl, handleTheme, handleStop, handleSound]);
 
   return {
     state,

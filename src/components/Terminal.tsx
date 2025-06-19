@@ -134,12 +134,7 @@ export function Terminal() {
         }`}>
           <div className="flex justify-between items-center max-w-screen-xl mx-auto">
             <span>
-              {state.buildRunning && '🔄 Build in progress'} 
-              {state.topRunning && '📊 Top running'} 
-              {!state.buildRunning && !state.topRunning && '✅ Ready'}
-            </span>
-            <span>
-              {state.theme === 'light' ? 'Day' : 'Night'} Mode • 
+              {state.theme === 'light' ? 'Day Mode' : 'Night Mode'} • 
               Sound: {state.soundEnabled ? 'On' : 'Off'} • 
               Commands: {state.commandHistory.length}
             </span>
