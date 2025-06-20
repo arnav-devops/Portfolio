@@ -7,6 +7,8 @@ function NeuralNetwork() {
   const groupRef = useRef<THREE.Group>(null);
   const particlesRef = useRef<THREE.BufferGeometry>(null);
   const linesGeometryRef = useRef<THREE.BufferGeometry>(null);
+  const packetsRef = useRef<THREE.InstancedMesh>(null);
+  const blinkTimes = useRef<{ [key: string]: number }>({});
 
   const maxParticleCount = 1000;
   const particleCount = 500;
@@ -21,6 +23,9 @@ function NeuralNetwork() {
   const particlePositions = useMemo(() => new Float32Array(maxParticleCount * 3), []);
   const particlesData = useMemo<{ velocity: THREE.Vector3; numConnections: number; }[]>(() => [], []);
   const v = useMemo(() => new THREE.Vector3(), []);
+
+  const [activeConnections, setActiveConnections] = React.useState<{ from: number; to: number; t: number; speed: number; }[]>([]);
+  const maxPackets = 100;
 
   useEffect(() => {
     for (let i = 0; i < maxParticleCount; i++) {
@@ -45,6 +50,8 @@ function NeuralNetwork() {
     let vertexpos = 0;
     let colorpos = 0;
     let numConnected = 0;
+    const newActiveConnections: { from: number; to: number; t: number; speed: number; }[] = [];
+    const now = performance.now();
 
     for (let i = 0; i < particleCount; i++) particlesData[i].numConnections = 0;
 
@@ -77,7 +84,16 @@ function NeuralNetwork() {
           particleData.numConnections++;
           particleDataB.numConnections++;
 
-          const alpha = 1.0 - dist / minDistance;
+          if (Math.random() < 0.002 && newActiveConnections.length < maxPackets) {
+            newActiveConnections.push({ from: i, to: j, t: 0, speed: 0.5 + Math.random() });
+            blinkTimes.current[`${i}-${j}`] = now;
+          }
+
+          let alpha = 1.0 - dist / minDistance;
+          const blinkKey = `${i}-${j}`;
+          if (blinkTimes.current[blinkKey] && now - blinkTimes.current[blinkKey] < 200) {
+            alpha = 1.0;
+          }
 
           positions[vertexpos++] = particlePositions[i * 3];
           positions[vertexpos++] = particlePositions[i * 3 + 1];
@@ -87,18 +103,25 @@ function NeuralNetwork() {
           positions[vertexpos++] = particlePositions[j * 3 + 1];
           positions[vertexpos++] = particlePositions[j * 3 + 2];
 
-          colors[colorpos++] = alpha;
-          colors[colorpos++] = alpha;
-          colors[colorpos++] = alpha;
+          colors[colorpos++] = 0.2 + 0.8 * alpha;
+          colors[colorpos++] = 0.5 * alpha;
+          colors[colorpos++] = 1.0 * alpha;
 
-          colors[colorpos++] = alpha;
-          colors[colorpos++] = alpha;
-          colors[colorpos++] = alpha;
+          colors[colorpos++] = 0.2 + 0.8 * alpha;
+          colors[colorpos++] = 0.5 * alpha;
+          colors[colorpos++] = 1.0 * alpha;
 
           numConnected++;
         }
       }
     }
+
+    setActiveConnections(prev => {
+      const updated = prev
+        .map(pkt => ({ ...pkt, t: pkt.t + delta * pkt.speed }))
+        .filter(pkt => pkt.t < 1);
+      return [...updated, ...newActiveConnections];
+    });
 
     if (linesGeometryRef.current) {
       linesGeometryRef.current.setDrawRange(0, numConnected * 2);
@@ -113,6 +136,7 @@ function NeuralNetwork() {
     }
   });
 
+  const packetColor = new THREE.Color(0x00ffea);
   return (
     <>
       <group ref={groupRef} dispose={null}>
@@ -129,9 +153,50 @@ function NeuralNetwork() {
           </bufferGeometry>
           <lineBasicMaterial vertexColors={true} blending={THREE.AdditiveBlending} transparent={true} />
         </lineSegments>
+        <instancedMesh ref={packetsRef} args={[undefined, undefined, maxPackets]}>
+          <sphereGeometry args={[0.13, 8, 8]} />
+          <meshBasicMaterial color={packetColor} transparent opacity={0.85} />
+        </instancedMesh>
       </group>
+      {activeConnections.length > 0 && (
+        <PacketAnimator
+          activeConnections={activeConnections}
+          particlePositions={particlePositions}
+          packetsRef={packetsRef}
+        />
+      )}
     </>
   );
+}
+
+function PacketAnimator({ activeConnections, particlePositions, packetsRef }: {
+  activeConnections: { from: number; to: number; t: number; speed: number; }[];
+  particlePositions: Float32Array;
+  packetsRef: React.RefObject<THREE.InstancedMesh>;
+}) {
+  useFrame(() => {
+    if (!packetsRef.current) return;
+    activeConnections.forEach((pkt, i) => {
+      const fromIdx = pkt.from * 3;
+      const toIdx = pkt.to * 3;
+      const from = new THREE.Vector3(
+        particlePositions[fromIdx],
+        particlePositions[fromIdx + 1],
+        particlePositions[fromIdx + 2]
+      );
+      const to = new THREE.Vector3(
+        particlePositions[toIdx],
+        particlePositions[toIdx + 1],
+        particlePositions[toIdx + 2]
+      );
+      const pos = from.clone().lerp(to, pkt.t);
+      const mat = new THREE.Matrix4().setPosition(pos);
+      packetsRef.current!.setMatrixAt(i, mat);
+    });
+    packetsRef.current.count = activeConnections.length;
+    packetsRef.current.instanceMatrix.needsUpdate = true;
+  });
+  return null;
 }
 
 export const NeuralNetworkBackground: React.FC = () => (

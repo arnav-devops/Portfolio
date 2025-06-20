@@ -87,13 +87,13 @@ export function Terminal() {
             {/* AWS */}
             <img src="https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg" alt="AWS Logo" className="h-7 w-auto" />
             {/* Kubernetes */}
-            <img src="https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo_with_border.png" alt="Kubernetes Logo" className="h-7 w-auto" />
+            <img src="https://logo.svgcdn.com/l/kubernetes.png" alt="Kubernetes Logo" className="h-7 w-auto" />
             {/* Terraform */}
-            <img src="https://avatars.githubusercontent.com/u/761456?v=4" alt="Terraform Logo" className="h-7 w-auto rounded-full bg-white" />
+            <img src="https://logo.svgcdn.com/l/terraform-icon-8x.png" alt="Terraform Logo" className="h-7 w-auto rounded-full bg-white" />
             {/* Docker */}
             <img src="https://www.docker.com/wp-content/uploads/2022/03/vertical-logo-monochromatic.png" alt="Docker Logo" className="h-7 w-auto" />
             {/* Azure */}
-            <img src="https://1000logos.net/wp-content/uploads/2021/06/Microsoft-Azure-Logo.png" alt="Azure Logo" className="h-7 w-auto" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Microsoft_Azure.svg/225px-Microsoft_Azure.svg.png" alt="Azure Logo" className="h-7 w-auto" />
             {/* Jenkins */}
             <img src="https://www.jenkins.io/images/logos/jenkins/jenkins.png" alt="Jenkins Logo" className="h-7 w-auto" />
           </div>
