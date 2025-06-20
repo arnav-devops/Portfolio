@@ -4,6 +4,7 @@ import { useTerminal } from '../hooks/useTerminal';
 import { CommandInput } from './CommandInput';
 import { CommandOutput } from './CommandOutput';
 import { ContactForm } from './ContactForm';
+import { NeuralNetworkBackground } from './NeuralNetworkBackground';
 
 export function Terminal() {
   const { state, executeCommand, updateCommand, navigateHistory, getAutocomplete, handleContactSubmit } = useTerminal();
@@ -38,7 +39,7 @@ export function Terminal() {
         : 'bg-gradient-to-br from-black via-gray-900 to-black text-green-400'
     }`}>
       {/* Neural Network Animation Background */}
-      {/* <NeuralNetworkBackground /> */}
+      <NeuralNetworkBackground />
       {/* Enhanced CRT Effect Overlay */}
       <div className="fixed inset-0 pointer-events-none z-10 opacity-20">
         <div className={`w-full h-full ${
